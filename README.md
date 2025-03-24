@@ -4,6 +4,8 @@
 The *sshspawner* enables JupyterHub to spawn single-user notebook servers on remote hosts over SSH.
 We provide this package as a reference implementation only, the authors offer no general user support.
 
+This fork has been updated to function without certificates, and instead only rely on keys. 
+
 ## Features
 
 * Supports SSH key-based authentication
@@ -24,6 +26,14 @@ python3 setup.py install
 ```
 
 Install [scripts/get_port.py](scripts/get_port.py) on remote host and set correct path for `c.SSHSpawner.remote_port_command` in [jupyterhub_config.py](jupyterhub_config.py)
+The script checks for a free TCP port which it returns to the hub, so that it launches the notebook on the correct port.  
+
+The current design assumes:
+- That the user running the JupyterHub has a `~/.ssh/id_rsa` which it can use to log in to any user on the remote servers.
+- The remote users have a venv folder named `venv` in their home directories, with `pip install jupyterhub` already installed, as well as `ipykernel`.
+    - The `activate` script must patched to provide a relative value for `$VIRTUAL_ENV`, as it is hardcoded. 
+
+The remote applciation launched is `jupyter-labhub`, instead of `jupyterhub-singleuser`. 
 
 ## Configuration
 
