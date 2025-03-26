@@ -30,10 +30,9 @@ The script checks for a free TCP port which it returns to the hub, so that it la
 
 The current design assumes:
 - That the user running the JupyterHub has a `~/.ssh/id_rsa` which it can use to log in to any user on the remote servers.
-- The remote users have a venv folder named `venv` in their home directories, with `pip install jupyterhub` already installed, as well as `ipykernel`.
-    - The `activate` script must patched to provide a relative value for `$VIRTUAL_ENV`, as it is hardcoded. 
+- The host running the notebooks must have the `venv` system-wide module for Python3 installed, as well as `jupyterhub` (or whatever provides `jupyterhub-singleuser`)
 
-The remote applciation launched is `jupyter-labhub`, instead of `jupyterhub-singleuser`. 
+The remote application launched is `jupyterhub-singleuser`. 
 
 ## Configuration
 

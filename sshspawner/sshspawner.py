@@ -6,6 +6,7 @@ import random
 import pwd
 import shutil
 from tempfile import TemporaryDirectory
+import hashlib
 
 from traitlets import Bool, Unicode, Integer, List, observe, default
 from jupyterhub.spawner import Spawner
@@ -133,8 +134,9 @@ class SSHSpawner(Spawner):
         await self.remote_signal(15)
         self.clear_state()
 
+    # The remote user will always be the MD5 checksum
     def get_remote_user(self, username):
-        return username
+        return hashlib.md5(username.encode('utf-8')).hexdigest()
 
     def choose_remote_host(self):
         return random.choice(self.remote_hosts)
@@ -150,8 +152,7 @@ class SSHSpawner(Spawner):
     async def remote_random_port(self):
         username = self.get_remote_user(self.user.name)
         kf = self.ssh_keyfile.format(username=username)
-        async with asyncssh.connect(self.remote_host, username=username,
-                                    client_keys=[kf], known_hosts=None) as conn:
+        async with asyncssh.connect(self.remote_host, username=username, client_keys=[kf], known_hosts=None) as conn:
             result = await conn.run(self.remote_port_command)
             stdout = result.stdout
             stderr = result.stderr
