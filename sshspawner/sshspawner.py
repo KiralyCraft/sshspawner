@@ -62,6 +62,7 @@ class SSHSpawner(Spawner):
             this base directory in the user's home directory."""),
             config=True)
 
+    # Load spawner state from a saved state dictionary.
     def load_state(self, state):
         super().load_state(state)
         if "pid" in state:
@@ -69,6 +70,7 @@ class SSHSpawner(Spawner):
         if "remote_ip" in state:
             self.remote_ip = state["remote_ip"]
 
+    # Retrieve the current state of the spawner as a dictionary.
     def get_state(self):
         state = super().get_state()
         if self.pid:
@@ -77,11 +79,13 @@ class SSHSpawner(Spawner):
             state["remote_ip"] = self.remote_ip
         return state
 
+    # Clear the spawner state, resetting remote IP and PID.
     def clear_state(self):
         super().clear_state()
         self.remote_ip = "remote_ip"
         self.pid = 0
 
+    # Start the notebook server on a remote host.
     async def start(self):
         username = self.user.name
         # Use the key file path directly (no certificate)
@@ -89,6 +93,7 @@ class SSHSpawner(Spawner):
         
         self.remote_host = self.choose_remote_host()
         
+        # Get a random unused port on the remote host
         self.remote_ip, remote_port = await self.remote_random_port()
         if self.remote_ip is None or remote_port is None or remote_port == 0:
             return False
@@ -97,6 +102,7 @@ class SSHSpawner(Spawner):
         cmd.extend(self.cmd)
         cmd.extend(self.get_args())    
 
+        # Update the hub API URL if it has been specified
         if self.hub_api_url != "":
             old = "--hub-api-url={}".format(self.hub.api_url)
             new = "--hub-api-url={}".format(self.hub_api_url)
@@ -104,6 +110,7 @@ class SSHSpawner(Spawner):
                 if value == old:
                     cmd[index] = new
         
+        # Append notebook configuration arguments
         cmd.append("--config=~/.jupyter/jupyter_notebook_config.py")
         cmd.append("--ip 0.0.0.0")
         cmd.append(f"--port={remote_port}")
@@ -111,17 +118,20 @@ class SSHSpawner(Spawner):
         remote_cmd = ' '.join(cmd)
         self.log.info("Remote cmd:" + remote_cmd)
         self.log.info("Local cmd:" + str(self.cmd))
+        # Execute the notebook command remotely and store the process ID
         self.pid = await self.exec_notebook(remote_cmd)
         self.log.info("Starting User: {}, PID: {}".format(self.user.name, self.pid))
         if self.pid < 0:
             return None
         return (self.remote_ip, remote_port)
 
+    # Poll the remote process to check if it is still running.
     async def poll(self):
         if not self.pid:
             self.clear_state()
             return 0
 
+        # Send signal 0 to check if process is alive
         alive = await self.remote_signal(0)
         self.log.debug("Polling returned {}".format(alive))
         if not alive:
@@ -130,25 +140,31 @@ class SSHSpawner(Spawner):
         else:
             return None
 
+    # Stop the remote notebook process.
     async def stop(self, now=False):
+        # Send termination signal (SIGTERM)
         await self.remote_signal(15)
         self.clear_state()
 
-    # The remote user will always be the MD5 checksum
+    # Generate a remote username by computing the MD5 hash of the given username.
     def get_remote_user(self, username):
         return hashlib.md5(username.encode('utf-8')).hexdigest()
 
+    # Randomly choose a remote host from the list of possible hosts.
     def choose_remote_host(self):
         return random.choice(self.remote_hosts)
 
+    # Log any changes made to the remote_host attribute.
     @observe('remote_host')
     def _log_remote_host(self, change):
         self.log.debug("Remote host was set to %s." % self.remote_host)
 
+    # Log any changes made to the remote_ip attribute.
     @observe('remote_ip')
     def _log_remote_ip(self, change):
         self.log.debug("Remote IP was set to %s." % self.remote_ip)
 
+    # Connect to the remote host and obtain an unused random port.
     async def remote_random_port(self):
         username = self.get_remote_user(self.user.name)
         kf = self.ssh_keyfile.format(username=username)
@@ -169,6 +185,7 @@ class SSHSpawner(Spawner):
             self.log.debug("EXITSTATUS={}".format(retcode))
         return (ip, port)
 
+    # Execute the notebook startup command on the remote host via SSH.
     async def exec_notebook(self, command):
         # Get environment for the spawned Jupyter server
         environment = super(SSHSpawner, self).get_env()
@@ -229,7 +246,7 @@ class SSHSpawner(Spawner):
         else:
             return -1
 
-
+    # Send a signal to the remote process via SSH.
     async def remote_signal(self, sig):
         username = self.get_remote_user(self.user.name)
         kf = self.ssh_keyfile.format(username=username)
@@ -243,6 +260,7 @@ class SSHSpawner(Spawner):
         self.log.debug("command: {} returned {} --- {} --- {}".format(command, stdout, stderr, retcode))
         return (retcode == 0)
 
+    # Stage certificate files by moving and copying key and CA files.
     def stage_certs(self, paths, dest):
         # Certificate staging is now simplified since SSH certificates are not used.
         shutil.move(paths['keyfile'], dest)
